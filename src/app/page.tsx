@@ -167,7 +167,14 @@ export default function MorningCollection() {
     if (token) headers['Authorization'] = `Bearer ${token}`;
     
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (!res.ok) throw new Error(`${res.status}`);
+    if (!res.ok) {
+      let errMsg = `${res.status}`;
+      try {
+        const errData = await res.json();
+        errMsg = `${res.status} - ${errData.errorMessage || errData.error || JSON.stringify(errData)}`;
+      } catch(e) {}
+      throw new Error(errMsg);
+    }
     return res.json();
   };
 
@@ -175,7 +182,7 @@ export default function MorningCollection() {
     if (!token) return;
     try {
       addLog('טוען נתונים...', 'in');
-      const invData = await apiCall('POST', 'documents/search', { page: 0, pageSize: 100, type: [300, 305, 320], status: [0], sort: 'documentDate' });
+      const invData = await apiCall('POST', 'documents/search', { page: 1, pageSize: 50, type: [300, 305, 320], status: [0] });
       const items = invData.items || invData || [];
       const mappedInvoices = items.map((x: any) => ({
         id: x.id,
@@ -192,7 +199,7 @@ export default function MorningCollection() {
         durl: x.files?.downloadLinks?.he || ''
       }));
 
-      const cliData = await apiCall('POST', 'clients/search', { page: 0, pageSize: 100, active: true });
+      const cliData = await apiCall('POST', 'clients/search', { page: 1, pageSize: 50, active: true });
       const cliItems = cliData.items || cliData || [];
       const mappedClients = cliItems.map((c: any) => ({
         id: c.id,

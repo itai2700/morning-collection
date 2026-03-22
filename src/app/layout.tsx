@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Heebo } from "next-kit/google"; // Wait, it's next/font/google
 import "./globals.css";
 
 // Use Heebo from Google Fonts via Next.js optimization
