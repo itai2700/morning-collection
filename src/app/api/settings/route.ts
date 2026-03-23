@@ -1,56 +1,102 @@
-import { neon } from '@neondatabase/serverless';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import {
+  DEFAULT_BUSINESS_NAME,
+  DEFAULT_EMAIL_SUBJECT,
+  DEFAULT_EMAIL_TEMPLATE,
+  DEFAULT_ENV,
+  DEFAULT_WHATSAPP_TEMPLATE,
+} from "@/lib/constants";
+import { requireDb } from "@/lib/db";
+import { requireAppSession } from "@/lib/session";
+import type { SettingsPayload } from "@/lib/types";
 
-function getDb() {
-  if (!process.env.DATABASE_URL) return null;
-  return neon(process.env.DATABASE_URL);
-}
+const DEFAULT_SETTINGS: SettingsPayload = {
+  businessName: DEFAULT_BUSINESS_NAME,
+  env: DEFAULT_ENV,
+  waTemplate: DEFAULT_WHATSAPP_TEMPLATE,
+  emailSubject: DEFAULT_EMAIL_SUBJECT,
+  emailTemplate: DEFAULT_EMAIL_TEMPLATE,
+  hasCredentials: false,
+};
 
 export async function GET() {
-  const sql = getDb();
-  if (!sql) {
-    return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+  const { session, response } = await requireAppSession();
+  if (response || !session) {
+    return response;
   }
 
   try {
-    // Create table if not exists (for initial setup)
-    await sql`CREATE TABLE IF NOT EXISTS global_settings (
-      id VARCHAR(50) PRIMARY KEY,
-      value TEXT NOT NULL
-    )`;
+    const sql = await requireDb();
+    const rows = (await sql`
+      SELECT
+        organizations.name,
+        organizations.morning_env,
+        organizations.wa_template,
+        organizations.email_subject,
+        organizations.email_template,
+        organization_secrets.organization_id AS has_credentials
+      FROM organizations
+      LEFT JOIN organization_secrets
+        ON organization_secrets.organization_id = organizations.id
+      WHERE organizations.id = ${session.user.organizationId}
+      LIMIT 1
+    `) as Array<{
+      name: string;
+      morning_env: string;
+      wa_template: string;
+      email_subject: string;
+      email_template: string;
+      has_credentials: string | null;
+    }>;
 
-    const result = await sql`SELECT value FROM global_settings WHERE id = 'app_settings'`;
-    if (result.length > 0) {
-      return NextResponse.json(JSON.parse(result[0].value));
+    const row = rows[0];
+    if (!row) {
+      return NextResponse.json(DEFAULT_SETTINGS);
     }
-    return NextResponse.json({});
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    return NextResponse.json({
+      businessName: row.name,
+      env: row.morning_env,
+      waTemplate: row.wa_template,
+      emailSubject: row.email_subject,
+      emailTemplate: row.email_template,
+      hasCredentials: Boolean(row.has_credentials),
+    } satisfies SettingsPayload);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load settings" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(req: Request) {
-  const sql = getDb();
-  if (!sql) {
-    return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+  const { session, response } = await requireAppSession();
+  if (response || !session) {
+    return response;
   }
 
   try {
-    const body = await req.json();
-    
-    await sql`CREATE TABLE IF NOT EXISTS global_settings (
-      id VARCHAR(50) PRIMARY KEY,
-      value TEXT NOT NULL
-    )`;
-    
+    const body = (await req.json()) as Partial<SettingsPayload>;
+    const sql = await requireDb();
+
     await sql`
-      INSERT INTO global_settings (id, value)
-      VALUES ('app_settings', ${JSON.stringify(body)})
-      ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value
+      UPDATE organizations
+      SET
+        name = ${body.businessName ?? DEFAULT_BUSINESS_NAME},
+        morning_env = ${body.env ?? DEFAULT_ENV},
+        wa_template = ${body.waTemplate ?? DEFAULT_WHATSAPP_TEMPLATE},
+        email_subject = ${body.emailSubject ?? DEFAULT_EMAIL_SUBJECT},
+        email_template = ${body.emailTemplate ?? DEFAULT_EMAIL_TEMPLATE},
+        updated_at = NOW()
+      WHERE id = ${session.user.organizationId}
     `;
-    
+
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to save settings" },
+      { status: 500 },
+    );
   }
 }
