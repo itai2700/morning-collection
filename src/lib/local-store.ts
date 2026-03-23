@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
+import os from "os";
 import path from "path";
 import {
   DEFAULT_BUSINESS_NAME,
@@ -91,7 +92,9 @@ type LocalState = {
   nextReminderEventId: number;
 };
 
-const STORE_DIR = path.join(process.cwd(), ".data");
+const STORE_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), "morning-collection")
+  : path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(STORE_DIR, "local-db.json");
 
 const DEFAULT_PREFERENCES: UserPreferences = {
