@@ -4,9 +4,15 @@ import { SignInScreen } from "@/components/sign-in-screen";
 
 export default async function Page() {
   const session = await auth();
+  const credentialsConfigured = Boolean(
+    process.env.AUTH_EMAIL &&
+      process.env.AUTH_PASSWORD &&
+      process.env.NEXTAUTH_SECRET &&
+      process.env.NEXTAUTH_URL,
+  );
 
   if (!session?.user) {
-    return <SignInScreen />;
+    return <SignInScreen credentialsConfigured={credentialsConfigured} />;
   }
 
   return (

@@ -1,32 +1,15 @@
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { DEFAULT_BUSINESS_NAME, DEFAULT_ORGANIZATION_ID } from "./constants";
 import { getDb, requireDb } from "./db";
 
-function getAllowedEmails() {
-  return new Set(
-    (process.env.GOOGLE_ALLOWED_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
-
-function isEmailAllowed(email: string) {
-  const allowedDomain = process.env.GOOGLE_ALLOWED_DOMAIN?.trim().toLowerCase();
-  const allowedEmails = getAllowedEmails();
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (allowedEmails.size > 0 && allowedEmails.has(normalizedEmail)) {
-    return true;
-  }
-
-  if (allowedDomain) {
-    return normalizedEmail.endsWith(`@${allowedDomain}`);
-  }
-
-  return allowedEmails.size === 0;
+function getConfiguredCredentials() {
+  return {
+    email: process.env.AUTH_EMAIL?.trim().toLowerCase() ?? "",
+    password: process.env.AUTH_PASSWORD ?? "",
+    name: process.env.AUTH_NAME?.trim() || "Itai",
+  };
 }
 
 async function upsertAppUser(user: {
@@ -96,9 +79,31 @@ async function getUserContext(email?: string | null) {
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    CredentialsProvider({
+      name: "Email and Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const configured = getConfiguredCredentials();
+        const email = credentials?.email?.trim().toLowerCase() ?? "";
+        const password = credentials?.password ?? "";
+
+        if (!configured.email || !configured.password) {
+          return null;
+        }
+
+        if (email !== configured.email || password !== configured.password) {
+          return null;
+        }
+
+        return {
+          id: configured.email,
+          email: configured.email,
+          name: configured.name,
+        };
+      },
     }),
   ],
   session: {
@@ -110,7 +115,8 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user }) {
-      if (!user.email || !isEmailAllowed(user.email)) {
+      const configured = getConfiguredCredentials();
+      if (!user.email || user.email.trim().toLowerCase() !== configured.email) {
         return false;
       }
 

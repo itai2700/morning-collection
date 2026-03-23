@@ -15,6 +15,8 @@ export default function GlobalError({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
+          position: "relative",
+          zIndex: 1,
           background: "#f6f7f9",
           color: "#1f2937",
           fontFamily: "Heebo, system-ui, -apple-system, Segoe UI, sans-serif",
@@ -87,4 +89,3 @@ export default function GlobalError({
     </html>
   );
 }
-
