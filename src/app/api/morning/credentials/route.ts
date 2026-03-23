@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { fetchMorningToken } from "@/lib/morning";
 import { requireDb } from "@/lib/db";
+import { saveLocalOrganizationCredentials } from "@/lib/local-store";
 import { requireAppSession } from "@/lib/session";
+import { hasDatabase } from "@/lib/storage";
 
 export async function POST(req: Request) {
   const { session, response } = await requireAppSession();
@@ -26,6 +28,17 @@ export async function POST(req: Request) {
       env: body.env ?? "production",
     });
 
+    if (!hasDatabase()) {
+      await saveLocalOrganizationCredentials({
+        organizationId: session.user.organizationId,
+        apiKeyId: body.apiKeyId,
+        apiSecret: body.apiSecret,
+        env: body.env ?? "production",
+      });
+
+      return NextResponse.json({ success: true, connected: true, storage: "local" });
+    }
+
     const sql = await requireDb();
     await sql`
       UPDATE organizations
@@ -48,7 +61,7 @@ export async function POST(req: Request) {
         updated_at = NOW()
     `;
 
-    return NextResponse.json({ success: true, connected: true });
+    return NextResponse.json({ success: true, connected: true, storage: "database" });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to save credentials" },
@@ -56,4 +69,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

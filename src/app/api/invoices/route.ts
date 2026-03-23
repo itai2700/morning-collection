@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { morningRequest } from "@/lib/morning";
 import { requireDb } from "@/lib/db";
+import { getLocalInvoiceMetadata } from "@/lib/local-store";
 import { requireAppSession } from "@/lib/session";
+import { hasDatabase } from "@/lib/storage";
 import type { Client, Invoice } from "@/lib/types";
 
 function mapInvoice(item: Record<string, unknown>): Invoice {
@@ -86,17 +88,18 @@ export async function GET() {
       }
     });
 
-    const sql = await requireDb();
-    const metadataRows = (await sql`
-      SELECT invoice_id, last_reminder_at, last_reminder_channel, reminder_count
-      FROM invoice_metadata
-      WHERE organization_id = ${session.user.organizationId}
-    `) as Array<{
-      invoice_id: string;
-      last_reminder_at: string | null;
-      last_reminder_channel: "whatsapp" | "email" | null;
-      reminder_count: number;
-    }>;
+    const metadataRows = hasDatabase()
+      ? ((await (await requireDb())`
+          SELECT invoice_id, last_reminder_at, last_reminder_channel, reminder_count
+          FROM invoice_metadata
+          WHERE organization_id = ${session.user.organizationId}
+        `) as Array<{
+          invoice_id: string;
+          last_reminder_at: string | null;
+          last_reminder_channel: "whatsapp" | "email" | null;
+          reminder_count: number;
+        }>)
+      : await getLocalInvoiceMetadata(session.user.organizationId);
 
     const metadataByInvoice = new Map(
       metadataRows.map((row) => [

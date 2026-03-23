@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireDb } from "@/lib/db";
+import { listLocalReminderEvents, recordLocalReminderEvents } from "@/lib/local-store";
 import { requireAppSession } from "@/lib/session";
+import { hasDatabase } from "@/lib/storage";
 
 export async function GET() {
   const { session, response } = await requireAppSession();
@@ -9,6 +11,12 @@ export async function GET() {
   }
 
   try {
+    if (!hasDatabase()) {
+      return NextResponse.json({
+        events: await listLocalReminderEvents(session.user.organizationId),
+      });
+    }
+
     const sql = await requireDb();
     const rows = (await sql`
       SELECT
@@ -74,6 +82,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No reminder events provided" }, { status: 400 });
     }
 
+    if (!hasDatabase()) {
+      await recordLocalReminderEvents({
+        organizationId: session.user.organizationId,
+        userId: session.user.id,
+        events,
+      });
+
+      return NextResponse.json({ success: true, storage: "local" });
+    }
+
     const sql = await requireDb();
     await Promise.all(
       events.map(async (event) => {
@@ -118,7 +136,7 @@ export async function POST(req: Request) {
       }),
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, storage: "database" });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to record reminders" },

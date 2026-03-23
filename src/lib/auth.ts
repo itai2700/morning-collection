@@ -3,6 +3,12 @@ import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { DEFAULT_BUSINESS_NAME, DEFAULT_ORGANIZATION_ID } from "./constants";
 import { getDb, requireDb } from "./db";
+import {
+  getLocalCredentialUser,
+  getLocalUserContext,
+  upsertLocalAppUser,
+} from "./local-store";
+import { verifyPassword } from "./passwords";
 
 function getConfiguredCredentials() {
   return {
@@ -18,6 +24,11 @@ async function upsertAppUser(user: {
   name?: string | null;
   image?: string | null;
 }) {
+  if (!getDb()) {
+    await upsertLocalAppUser(user);
+    return;
+  }
+
   const sql = await requireDb();
 
   await sql`
@@ -56,7 +67,7 @@ async function getUserContext(email?: string | null) {
 
   const sql = getDb();
   if (!sql) {
-    return null;
+    return getLocalUserContext(email);
   }
 
   const result = (await sql`
@@ -77,6 +88,32 @@ async function getUserContext(email?: string | null) {
   return result[0] ?? null;
 }
 
+async function getDbCredentialUser(email: string) {
+  const sql = getDb();
+  if (!sql) {
+    return getLocalCredentialUser(email);
+  }
+
+  const result = (await sql`
+    SELECT
+      app_users.id,
+      app_users.email,
+      app_users.name,
+      user_auth_credentials.password_hash
+    FROM app_users
+    JOIN user_auth_credentials ON user_auth_credentials.user_id = app_users.id
+    WHERE app_users.email = ${email}
+    LIMIT 1
+  `) as Array<{
+    id: string;
+    email: string;
+    name: string | null;
+    password_hash: string;
+  }>;
+
+  return result[0] ?? null;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -89,6 +126,15 @@ export const authOptions: NextAuthOptions = {
         const configured = getConfiguredCredentials();
         const email = credentials?.email?.trim().toLowerCase() ?? "";
         const password = credentials?.password ?? "";
+
+        const dbUser = email ? await getDbCredentialUser(email) : null;
+        if (dbUser && (await verifyPassword(password, dbUser.password_hash))) {
+          return {
+            id: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name ?? dbUser.email,
+          };
+        }
 
         if (!configured.email || !configured.password) {
           return null;
@@ -115,8 +161,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user }) {
-      const configured = getConfiguredCredentials();
-      if (!user.email || user.email.trim().toLowerCase() !== configured.email) {
+      if (!user.email) {
         return false;
       }
 

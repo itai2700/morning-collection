@@ -11,6 +11,8 @@ import {
 type SqlClient = ReturnType<typeof neon>;
 
 let schemaReady: Promise<void> | null = null;
+const DATABASE_URL_ERROR =
+  "DATABASE_URL is not configured. Add your Postgres connection string to .env.local and restart the Next.js server.";
 
 export function getDb(): SqlClient | null {
   const url = process.env.DATABASE_URL;
@@ -24,7 +26,7 @@ export function getDb(): SqlClient | null {
 export async function ensureSchema() {
   const sql = getDb();
   if (!sql) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new Error(DATABASE_URL_ERROR);
   }
 
   if (!schemaReady) {
@@ -58,6 +60,15 @@ export async function ensureSchema() {
           name TEXT,
           image TEXT,
           organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS user_auth_credentials (
+          user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE,
+          password_hash TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -122,7 +133,7 @@ export async function ensureSchema() {
 export async function requireDb() {
   const sql = getDb();
   if (!sql) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new Error(DATABASE_URL_ERROR);
   }
 
   await ensureSchema();

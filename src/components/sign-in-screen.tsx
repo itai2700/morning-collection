@@ -1,19 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-export function SignInScreen({ credentialsConfigured }: { credentialsConfigured: boolean }) {
+export function SignInScreen({ authConfigured }: { authConfigured: boolean }) {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const error = searchParams.get("error");
+  const registered = searchParams.get("registered");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!credentialsConfigured || isSubmitting) {
+    if (!authConfigured || isSubmitting) {
       return;
     }
 
@@ -79,7 +81,7 @@ export function SignInScreen({ credentialsConfigured }: { credentialsConfigured:
               onChange={(event) => setEmail(event.target.value)}
               placeholder="itai@bo-nobo.com"
               autoComplete="email"
-              disabled={!credentialsConfigured || isSubmitting}
+              disabled={!authConfigured || isSubmitting}
             />
           </div>
           <div className="fld">
@@ -90,14 +92,14 @@ export function SignInScreen({ credentialsConfigured }: { credentialsConfigured:
               onChange={(event) => setPassword(event.target.value)}
               placeholder="ססמה"
               autoComplete="current-password"
-              disabled={!credentialsConfigured || isSubmitting}
+              disabled={!authConfigured || isSubmitting}
             />
           </div>
-          <button className="btn bp" type="submit" disabled={!credentialsConfigured || isSubmitting}>
+          <button className="btn bp" type="submit" disabled={!authConfigured || isSubmitting}>
             {isSubmitting ? "מתחבר..." : "התחבר"}
           </button>
 
-          {error && credentialsConfigured && (
+          {error && authConfigured && (
             <div className="conn-fb error">
               <div className="cfb-icon">✕</div>
               <div>
@@ -107,18 +109,31 @@ export function SignInScreen({ credentialsConfigured }: { credentialsConfigured:
             </div>
           )}
 
-          {!credentialsConfigured && (
+          {registered && (
+            <div className="conn-fb success">
+              <div className="cfb-icon">✓</div>
+              <div>
+                <div>המשתמש נוצר</div>
+                <div className="cfb-steps">אפשר להתחבר עכשיו עם המייל והססמה החדשים.</div>
+              </div>
+            </div>
+          )}
+
+          {!authConfigured && (
             <div className="conn-fb error">
               <div className="cfb-icon">✕</div>
               <div>
-                <div>Credentials Auth לא מוגדר</div>
+                <div>NextAuth לא מוגדר</div>
                 <div className="cfb-steps">
-                  יש להגדיר `AUTH_EMAIL`, `AUTH_PASSWORD`, `NEXTAUTH_SECRET`
-                  ו-`NEXTAUTH_URL`.
+                  יש להגדיר `NEXTAUTH_SECRET` ו-`NEXTAUTH_URL`.
                 </div>
               </div>
             </div>
           )}
+
+          <Link href="/register" className="btn bg" style={{ textDecoration: "none" }}>
+            Register
+          </Link>
         </form>
       </div>
     </main>

@@ -1,4 +1,6 @@
 import { requireDb } from "./db";
+import { getLocalOrganizationCredentials } from "./local-store";
+import { hasDatabase } from "./storage";
 
 type MorningEnv = "production" | "sandbox";
 
@@ -34,6 +36,10 @@ export async function fetchMorningToken(credentials: {
 }
 
 export async function getOrganizationCredentials(organizationId: string) {
+  if (!hasDatabase()) {
+    return getLocalOrganizationCredentials(organizationId);
+  }
+
   const sql = await requireDb();
   const rows = (await sql`
     SELECT

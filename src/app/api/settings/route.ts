@@ -7,7 +7,9 @@ import {
   DEFAULT_WHATSAPP_TEMPLATE,
 } from "@/lib/constants";
 import { requireDb } from "@/lib/db";
+import { getLocalSettings, saveLocalSettings } from "@/lib/local-store";
 import { requireAppSession } from "@/lib/session";
+import { hasDatabase } from "@/lib/storage";
 import type { SettingsPayload } from "@/lib/types";
 
 const DEFAULT_SETTINGS: SettingsPayload = {
@@ -26,6 +28,10 @@ export async function GET() {
   }
 
   try {
+    if (!hasDatabase()) {
+      return NextResponse.json(await getLocalSettings(session.user.organizationId));
+    }
+
     const sql = await requireDb();
     const rows = (await sql`
       SELECT
@@ -78,6 +84,12 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as Partial<SettingsPayload>;
+
+    if (!hasDatabase()) {
+      await saveLocalSettings(session.user.organizationId, body);
+      return NextResponse.json({ success: true, storage: "local" });
+    }
+
     const sql = await requireDb();
 
     await sql`
@@ -92,7 +104,7 @@ export async function POST(req: Request) {
       WHERE id = ${session.user.organizationId}
     `;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, storage: "database" });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to save settings" },

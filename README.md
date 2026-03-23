@@ -1,4 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a Next.js app for managing invoice reminders and Morning connection settings.
+
+## Environment
+
+Copy `.env.example` to `.env.local` and set the required variables:
+
+```bash
+cp .env.example .env.local
+```
+
+Required values:
+
+- `DATABASE_URL`: Postgres connection string used for users, preferences, reminder history, and Morning credentials
+- `NEXTAUTH_URL`: usually `http://localhost:3000` in local development
+- `NEXTAUTH_SECRET`: random secret for NextAuth
+- `AUTH_EMAIL`, `AUTH_PASSWORD`, `AUTH_NAME`: local fallback credentials for sign-in
+
+Example:
+
+```env
+DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB_NAME?sslmode=require
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=replace-with-a-random-secret
+AUTH_EMAIL=name@example.com
+AUTH_PASSWORD=replace-with-a-password
+AUTH_NAME=Your Name
+```
+
+If `DATABASE_URL` is missing, registration and all database-backed API routes will fail.
 
 ## Getting Started
 
@@ -14,11 +42,7 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) after the env file is configured.
 
 ## Learn More
 
